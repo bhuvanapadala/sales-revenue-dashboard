@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales & Revenue Analysis Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#F4F3EF;
+    --surface:#FFFFFF;
+    --surface2:#EDECE8;
+    --border:rgba(0,0,0,0.12);
+    --text:#111110;
+    --text2:#6B6B67;
+    --text3:#9B9B96;
+    --blue:#1A56A0;
+    --green:#2D6A0F;
+    --amber:#B06B10;
+    --red:#A0221A;
+    --blue-light:rgba(26,86,160,0.1);
+    --green-light:rgba(45,106,15,0.1);
+    --amber-light:rgba(176,107,16,0.1);
+    --red-light:rgba(160,34,26,0.1);
+    --shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.06);
+    --radius:10px;
+  }
+  body{
+    font-family:'DM Sans',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    line-height:1.5;
+  }
+  .dash{display:flex;flex-direction:column;gap:14px;padding:16px;max-width:1400px;margin:0 auto}
+
+  /* TOP BAR */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 20px;box-shadow:var(--shadow);
+  }
+  .topbar-left h1{font-size:17px;font-weight:600;letter-spacing:-0.3px}
+  .topbar-left p{font-size:12px;color:var(--text2);margin-top:1px}
+  .topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  select{
+    font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 10px;
+    border:1px solid var(--border);border-radius:7px;
+    background:var(--surface2);color:var(--text);cursor:pointer;outline:none;
+  }
+  select:focus{border-color:var(--blue)}
+  .upload-btn{
+    display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;
+    font-size:12px;font-weight:500;padding:6px 14px;
+    border:1px solid var(--border);border-radius:7px;
+    background:var(--surface);color:var(--text);cursor:pointer;
+    transition:background 0.15s;
+  }
+  .upload-btn:hover{background:var(--surface2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:#3ECF72;flex-shrink:0}
+
+  /* KPI GRID */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}
+  .kpi{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;box-shadow:var(--shadow);
+  }
+  .kpi-label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+  .kpi-value{font-size:24px;font-weight:600;letter-spacing:-0.5px;color:var(--text)}
+  .kpi-sub{font-size:11px;margin-top:5px;color:var(--text3)}
+  .kpi-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:500;padding:2px 7px;border-radius:20px}
+  .kpi-badge.up{background:var(--green-light);color:var(--green)}
+  .kpi-badge.neutral{background:var(--surface2);color:var(--text2)}
+
+  /* PERIOD CHIPS */
+  .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .chip-label{font-size:12px;color:var(--text2);margin-right:2px}
+  .chip{
+    display:inline-flex;align-items:center;gap:4px;padding:5px 12px;
+    border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;
+    border:1px solid var(--border);background:var(--surface);color:var(--text2);
+    transition:all 0.15s;
+  }
+  .chip:hover{background:var(--surface2)}
+  .chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* CHARTS */
+  .charts-row{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+  .charts-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:16px;box-shadow:var(--shadow);
+  }
+  .card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .card-sub{font-size:11px;color:var(--text3);margin-bottom:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+  .leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+  .leg-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+  /* SEARCH & FILTERS */
+  .search-input{
+    font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 10px;
+    border:1px solid var(--border);border-radius:7px;width:200px;
+    background:var(--surface2);color:var(--text);outline:none;
+  }
+  .search-input:focus{border-color:var(--blue)}
+  .row-count{font-size:11px;color:var(--text3);margin-left:auto}
+
+  /* TABLE */
+  .table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{
+    background:var(--surface2);padding:8px 12px;text-align:left;
+    font-weight:500;color:var(--text2);white-space:nowrap;
+    font-size:11px;text-transform:uppercase;letter-spacing:0.4px;
+  }
+  td{padding:8px 12px;border-top:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:11px}
+  td:first-child,td:nth-child(2),td:nth-child(3),td:nth-child(4),td:nth-child(5){font-family:'DM Sans',sans-serif;font-size:12px}
+  tr:hover td{background:var(--surface2)}
+
+  /* BADGES */
+  .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px}
+  .badge-green{background:var(--green-light);color:var(--green)}
+  .badge-amber{background:var(--amber-light);color:var(--amber)}
+  .badge-red{background:var(--red-light);color:var(--red)}
+
+  /* FOOTER */
+  .footer{text-align:center;font-size:11px;color:var(--text3);padding:8px 0 4px}
+
+  @media(max-width:700px){
+    .charts-row,.charts-row2{grid-template-columns:1fr}
+    .kpi-value{font-size:20px}
+  }
+</style>
+</head>
+<body>
+<div class="dash">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px">
+        <span class="dot"></span>
+        <span style="font-size:10px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">Live</span>
+      </div>
+      <h1>Sales &amp; Revenue Dashboard</h1>
+      <p>Interactive analysis · Import your data to get started</p>
+    </div>
+    <div class="topbar-right">
+      <select id="yearFilter"><option value="all">All Years</option></select>
+      <select id="regionFilter"><option value="all">All Regions</option></select>
+      <label class="upload-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import CSV / XLSX
+        <input type="file" accept=".csv,.xlsx,.xls" style="display:none" id="fileInput">
+      </label>
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value" id="kpiRev">—</div>
+      <div class="kpi-sub" id="kpiRevSub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Units Sold</div>
+      <div class="kpi-value" id="kpiSales">—</div>
+      <div class="kpi-sub" id="kpiSalesSub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg Order Value</div>
+      <div class="kpi-value" id="kpiAov">—</div>
+      <div class="kpi-sub" id="kpiAovSub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Top Product</div>
+      <div class="kpi-value" id="kpiTop" style="font-size:15px;padding-top:5px">—</div>
+      <div class="kpi-sub" id="kpiTopSub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Unique Customers</div>
+      <div class="kpi-value" id="kpiCust">—</div>
+      <div class="kpi-sub" id="kpiCustSub"></div>
+    </div>
+  </div>
+
+  <!-- PERIOD CHIPS -->
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span class="chip-label">Trend view:</span>
+    <div class="chips">
+      <span class="chip active" data-period="monthly">Monthly</span>
+      <span class="chip" data-period="quarterly">Quarterly</span>
+      <span class="chip" data-period="yearly">Yearly</span>
+    </div>
+  </div>
+
+  <!-- CHART ROW 1 -->
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">Revenue &amp; Sales Trend</div>
+      <div class="card-sub">Revenue (bars) vs Units sold (line)</div>
+      <div class="legend" id="trendLegend">
+        <span class="leg-item"><span class="leg-dot" style="background:#1A56A0"></span>Revenue</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#2D6A0F"></span>Units Sold</span>
+      </div>
+      <div style="position:relative;height:230px"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Revenue by Category</div>
+      <div class="card-sub">Share of total revenue</div>
+      <div class="legend" id="catLegend"></div>
+      <div style="position:relative;height:185px"><canvas id="catChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHART ROW 2 -->
+  <div class="charts-row2">
+    <div class="card">
+      <div class="card-title">Top 5 Products</div>
+      <div class="card-sub">By total revenue generated</div>
+      <div style="position:relative;height:210px"><canvas id="prodChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sales by Region</div>
+      <div class="card-sub">Units sold per region</div>
+      <div style="position:relative;height:210px"><canvas id="regionChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Transaction Details</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input class="search-input" id="searchBox" type="text" placeholder="Search product or customer…">
+      <select id="statusFilter" style="font-size:12px;padding:6px 10px">
+        <option value="all">All Status</option>
+        <option value="completed">Completed</option>
+        <option value="pending">Pending</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <span class="row-count" id="rowCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead><tr id="tableHead"></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">Sales &amp; Revenue Analysis Dashboard &mdash; Import your CSV/XLSX to analyse your own data</div>
+</div>
+
+<script>
+const SAMPLE_DATA = [
+  {date:'2024-01-05',product:'Laptop Pro',category:'Electronics',region:'North',customer:'Alice Corp',revenue:1200,units:2,status:'completed'},
+  {date:'2024-01-12',product:'Office Chair',category:'Furniture',region:'South',customer:'Bob Ltd',revenue:350,units:3,status:'completed'},
+  {date:'2024-01-20',product:'Webcam HD',category:'Electronics',region:'East',customer:'Carol Inc',revenue:180,units:5,status:'pending'},
+  {date:'2024-02-03',product:'Laptop Pro',category:'Electronics',region:'West',customer:'Dave Co',revenue:2400,units:4,status:'completed'},
+  {date:'2024-02-14',product:'Standing Desk',category:'Furniture',region:'North',customer:'Eve LLC',revenue:620,units:2,status:'completed'},
+  {date:'2024-02-22',product:'Noise Canceller',category:'Electronics',region:'South',customer:'Frank Corp',revenue:290,units:6,status:'cancelled'},
+  {date:'2024-03-08',product:'Monitor 4K',category:'Electronics',region:'East',customer:'Grace Ltd',revenue:980,units:3,status:'completed'},
+  {date:'2024-03-15',product:'Ergonomic Mouse',category:'Accessories',region:'West',customer:'Hank Inc',revenue:120,units:10,status:'completed'},
+  {date:'2024-03-28',product:'Laptop Pro',category:'Electronics',region:'North',customer:'Iris Co',revenue:1800,units:3,status:'completed'},
+  {date:'2024-04-05',product:'Office Chair',category:'Furniture',region:'South',customer:'Jake LLC',revenue:700,units:6,status:'pending'},
+  {date:'2024-04-18',product:'Webcam HD',category:'Electronics',region:'East',customer:'Kate Corp',revenue:240,units:8,status:'completed'},
+  {date:'2024-04-25',product:'USB Hub',category:'Accessories',region:'West',customer:'Leo Ltd',revenue:90,units:12,status:'completed'},
+  {date:'2024-05-02',product:'Monitor 4K',category:'Electronics',region:'North',customer:'Mia Inc',revenue:1300,units:4,status:'completed'},
+  {date:'2024-05-14',product:'Standing Desk',category:'Furniture',region:'South',customer:'Ned Co',revenue:930,units:3,status:'completed'},
+  {date:'2024-05-20',product:'Laptop Pro',category:'Electronics',region:'East',customer:'Olivia LLC',revenue:3000,units:5,status:'completed'},
+  {date:'2024-06-07',product:'Ergonomic Mouse',category:'Accessories',region:'West',customer:'Paul Corp',revenue:200,units:18,status:'completed'},
+  {date:'2024-06-15',product:'Noise Canceller',category:'Electronics',region:'North',customer:'Quinn Ltd',revenue:580,units:12,status:'completed'},
+  {date:'2024-06-23',product:'USB Hub',category:'Accessories',region:'South',customer:'Rose Inc',revenue:150,units:20,status:'pending'},
+  {date:'2024-07-01',product:'Monitor 4K',category:'Electronics',region:'East',customer:'Sam Co',revenue:1960,units:6,status:'completed'},
+  {date:'2024-07-12',product:'Office Chair',category:'Furniture',region:'West',customer:'Tina LLC',revenue:420,units:4,status:'completed'},
+  {date:'2024-07-19',product:'Laptop Pro',category:'Electronics',region:'North',customer:'Uma Corp',revenue:2400,units:4,status:'completed'},
+  {date:'2024-08-04',product:'Standing Desk',category:'Furniture',region:'South',customer:'Vince Ltd',revenue:1240,units:4,status:'completed'},
+  {date:'2024-08-17',product:'Webcam HD',category:'Electronics',region:'East',customer:'Wendy Inc',revenue:360,units:12,status:'cancelled'},
+  {date:'2024-08-26',product:'Ergonomic Mouse',category:'Accessories',region:'West',customer:'Xena Co',revenue:280,units:25,status:'completed'},
+  {date:'2024-09-03',product:'Noise Canceller',category:'Electronics',region:'North',customer:'Yale LLC',revenue:870,units:18,status:'completed'},
+  {date:'2024-09-16',product:'USB Hub',category:'Accessories',region:'South',customer:'Zara Corp',revenue:210,units:28,status:'completed'},
+  {date:'2024-09-25',product:'Monitor 4K',category:'Electronics',region:'East',customer:'Aaron Ltd',revenue:2450,units:7,status:'pending'},
+  {date:'2024-10-08',product:'Laptop Pro',category:'Electronics',region:'West',customer:'Beth Inc',revenue:3600,units:6,status:'completed'},
+  {date:'2024-10-14',product:'Office Chair',category:'Furniture',region:'North',customer:'Carl Co',revenue:560,units:5,status:'completed'},
+  {date:'2024-10-22',product:'Standing Desk',category:'Furniture',region:'South',customer:'Dana LLC',revenue:1550,units:5,status:'completed'},
+  {date:'2024-11-05',product:'Webcam HD',category:'Electronics',region:'East',customer:'Eli Corp',revenue:480,units:16,status:'completed'},
+  {date:'2024-11-18',product:'Ergonomic Mouse',category:'Accessories',region:'West',customer:'Faye Ltd',revenue:340,units:30,status:'completed'},
+  {date:'2024-11-28',product:'Noise Canceller',category:'Electronics',region:'North',customer:'Gary Inc',revenue:1160,units:24,status:'completed'},
+  {date:'2024-12-05',product:'USB Hub',category:'Accessories',region:'South',customer:'Helen Co',revenue:270,units:36,status:'pending'},
+  {date:'2024-12-14',product:'Monitor 4K',category:'Electronics',region:'East',customer:'Ivan LLC',revenue:2940,units:9,status:'completed'},
+  {date:'2024-12-23',product:'Laptop Pro',category:'Electronics',region:'West',customer:'Jane Corp',revenue:4200,units:7,status:'completed'},
+  {date:'2025-01-08',product:'Office Chair',category:'Furniture',region:'North',customer:'Karl Ltd',revenue:700,units:7,status:'completed'},
+  {date:'2025-01-19',product:'Standing Desk',category:'Furniture',region:'South',customer:'Lena Inc',revenue:1860,units:6,status:'completed'},
+  {date:'2025-02-04',product:'Laptop Pro',category:'Electronics',region:'East',customer:'Max Co',revenue:5000,units:8,status:'completed'},
+  {date:'2025-02-17',product:'Noise Canceller',category:'Electronics',region:'West',customer:'Nora LLC',revenue:1450,units:30,status:'completed'},
+  {date:'2025-03-01',product:'Monitor 4K',category:'Electronics',region:'North',customer:'Owen Corp',revenue:3430,units:11,status:'completed'},
+  {date:'2025-03-14',product:'Ergonomic Mouse',category:'Accessories',region:'South',customer:'Pam Ltd',revenue:420,units:38,status:'completed'},
+  {date:'2025-04-06',product:'Webcam HD',category:'Electronics',region:'East',customer:'Quinn Inc',revenue:600,units:20,status:'pending'},
+  {date:'2025-04-22',product:'USB Hub',category:'Accessories',region:'West',customer:'Rex Co',revenue:330,units:44,status:'completed'},
+  {date:'2025-05-10',product:'Laptop Pro',category:'Electronics',region:'North',customer:'Sue LLC',revenue:6000,units:10,status:'completed'},
+];
+
+const CAT_COLORS=['#1A56A0','#2D6A0F','#B06B10','#8B2252','#0D6B56','#3A3189','#963C1D'];
+const REGION_COLORS=['#1A56A0','#B06B10','#2D6A0F','#8B2252'];
+
+let allData=[...SAMPLE_DATA],filteredData=[...allData],period='monthly';
+let trendChart,catChart,prodChart,regionChart;
+
+const fmt=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+const fmtK=n=>n>=1000?'$'+(n/1000).toFixed(1)+'K':'$'+n;
+
+function populateFilters(){
+  const years=[...new Set(allData.map(d=>d.date.slice(0,4)))].sort();
+  const regions=[...new Set(allData.map(d=>d.region))].sort();
+  document.getElementById('yearFilter').innerHTML='<option value="all">All Years</option>'+years.map(y=>`<option>${y}</option>`).join('');
+  document.getElementById('regionFilter').innerHTML='<option value="all">All Regions</option>'+regions.map(r=>`<option>${r}</option>`).join('');
+}
+
+function applyFilters(){
+  const yr=document.getElementById('yearFilter').value;
+  const rg=document.getElementById('regionFilter').value;
+  const st=document.getElementById('statusFilter').value;
+  const q=document.getElementById('searchBox').value.toLowerCase();
+  filteredData=allData.filter(d=>{
+    if(yr!=='all'&&!d.date.startsWith(yr))return false;
+    if(rg!=='all'&&d.region!==rg)return false;
+    if(st!=='all'&&d.status!==st)return false;
+    if(q&&!d.product.toLowerCase().includes(q)&&!d.customer.toLowerCase().includes(q))return false;
+    return true;
+  });
+  render();
+}
+
+function computeKPIs(){
+  const rev=filteredData.reduce((a,d)=>a+d.revenue,0);
+  const sales=filteredData.reduce((a,d)=>a+d.units,0);
+  const aov=filteredData.length?rev/filteredData.length:0;
+  const custs=new Set(filteredData.map(d=>d.customer)).size;
+  const prodMap={};
+  filteredData.forEach(d=>{prodMap[d.product]=(prodMap[d.product]||0)+d.revenue});
+  const top=Object.entries(prodMap).sort((a,b)=>b[1]-a[1])[0]||['—',0];
+  document.getElementById('kpiRev').textContent=fmt(rev);
+  document.getElementById('kpiRevSub').textContent=filteredData.length+' transactions';
+  document.getElementById('kpiSales').textContent=sales.toLocaleString();
+  document.getElementById('kpiSalesSub').textContent='units across all orders';
+  document.getElementById('kpiAov').textContent=fmt(Math.round(aov));
+  document.getElementById('kpiAovSub').textContent='per transaction';
+  document.getElementById('kpiTop').textContent=top[0];
+  document.getElementById('kpiTopSub').textContent=fmt(top[1])+' revenue';
+  document.getElementById('kpiCust').textContent=custs;
+  document.getElementById('kpiCustSub').textContent='unique accounts';
+}
+
+function groupByPeriod(){
+  const map={};
+  filteredData.forEach(d=>{
+    const dt=new Date(d.date);
+    let key;
+    if(period==='monthly')key=d.date.slice(0,7);
+    else if(period==='quarterly')key=`${dt.getFullYear()} Q${Math.ceil((dt.getMonth()+1)/3)}`;
+    else key=dt.getFullYear().toString();
+    if(!map[key])map[key]={rev:0,units:0};
+    map[key].rev+=d.revenue;
+    map[key].units+=d.units;
+  });
+  return map;
+}
+
+function renderTrend(){
+  const map=groupByPeriod();
+  const labels=Object.keys(map).sort();
+  const revs=labels.map(k=>map[k].rev);
+  const units=labels.map(k=>map[k].units);
+  if(trendChart)trendChart.destroy();
+  trendChart=new Chart(document.getElementById('trendChart'),{
+    data:{labels,datasets:[
+      {type:'bar',label:'Revenue',data:revs,backgroundColor:'rgba(26,86,160,0.75)',borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'Units',data:units,borderColor:'#2D6A0F',backgroundColor:'rgba(45,106,15,0.08)',fill:true,tension:0.4,yAxisID:'y1',pointRadius:3,borderWidth:2}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{position:'left',ticks:{callback:v=>fmtK(v),font:{size:10,family:'DM Mono'}},grid:{color:'rgba(0,0,0,.06)'}},
+        y1:{position:'right',ticks:{font:{size:10,family:'DM Mono'}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function renderCategory(){
+  const map={};
+  filteredData.forEach(d=>{map[d.category]=(map[d.category]||0)+d.revenue});
+  const entries=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  const total=entries.reduce((a,e)=>a+e[1],0);
+  document.getElementById('catLegend').innerHTML=entries.map((e,i)=>`<span class="leg-item"><span class="leg-dot" style="background:${CAT_COLORS[i%CAT_COLORS.length]}"></span>${e[0]} ${Math.round(e[1]/total*100)}%</span>`).join('');
+  if(catChart)catChart.destroy();
+  catChart=new Chart(document.getElementById('catChart'),{
+    type:'doughnut',
+    data:{labels:entries.map(e=>e[0]),datasets:[{data:entries.map(e=>e[1]),backgroundColor:CAT_COLORS.slice(0,entries.length),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${fmt(ctx.raw)}`}}}}
+  });
+}
+
+function renderProducts(){
+  const map={};
+  filteredData.forEach(d=>{map[d.product]=(map[d.product]||0)+d.revenue});
+  const entries=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(prodChart)prodChart.destroy();
+  prodChart=new Chart(document.getElementById('prodChart'),{
+    type:'bar',
+    data:{labels:entries.map(e=>e[0]),datasets:[{data:entries.map(e=>e[1]),backgroundColor:CAT_COLORS.slice(0,5),borderWidth:0,borderRadius:4}]},
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${fmt(ctx.raw)}`}}},
+      scales:{x:{ticks:{callback:v=>fmtK(v),font:{size:10,family:'DM Mono'}},grid:{color:'rgba(0,0,0,.05)'}},y:{ticks:{font:{size:11,family:'DM Sans'}}}}
+    }
+  });
+}
+
+function renderRegion(){
+  const map={};
+  filteredData.forEach(d=>{map[d.region]=(map[d.region]||0)+d.units});
+  const entries=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  if(regionChart)regionChart.destroy();
+  regionChart=new Chart(document.getElementById('regionChart'),{
+    type:'bar',
+    data:{labels:entries.map(e=>e[0]),datasets:[{data:entries.map(e=>e[1]),backgroundColor:REGION_COLORS.slice(0,entries.length),borderWidth:0,borderRadius:4}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw} units`}}},
+      scales:{y:{ticks:{font:{size:10,family:'DM Mono'}},grid:{color:'rgba(0,0,0,.05)'}},x:{ticks:{font:{size:11,family:'DM Sans'}}}}
+    }
+  });
+}
+
+function renderTable(){
+  const cols=['Date','Product','Category','Region','Customer','Revenue','Units','Status'];
+  document.getElementById('tableHead').innerHTML=cols.map(c=>`<th>${c}</th>`).join('');
+  const rows=filteredData.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,50);
+  document.getElementById('rowCount').textContent=`Showing ${rows.length} of ${filteredData.length} rows`;
+  document.getElementById('tableBody').innerHTML=rows.map(d=>{
+    const badge=d.status==='completed'?'badge-green':d.status==='pending'?'badge-amber':'badge-red';
+    return `<tr><td>${d.date}</td><td>${d.product}</td><td>${d.category}</td><td>${d.region}</td><td>${d.customer}</td><td>${fmt(d.revenue)}</td><td>${d.units}</td><td><span class="badge ${badge}">${d.status}</span></td></tr>`;
+  }).join('')||`<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text3)">No data found</td></tr>`;
+}
+
+function render(){computeKPIs();renderTrend();renderCategory();renderProducts();renderRegion();renderTable()}
+
+function parseRows(rows){
+  if(!rows||!rows.length)return[];
+  const hdr=rows[0].map(h=>(h||'').toString().toLowerCase().trim());
+  const find=(...keys)=>{for(const k of keys){const i=hdr.indexOf(k);if(i>-1)return i}return-1};
+  const dateI=find('date','order date','sale date');
+  const prodI=find('product','product name','item');
+  const catI=find('category','cat','type');
+  const regI=find('region','area','location');
+  const custI=find('customer','client','customer name');
+  const revI=find('revenue','amount','total','sales amount','price');
+  const unitI=find('units','quantity','qty','count');
+  const stI=find('status','order status');
+  return rows.slice(1).filter(r=>r.some(c=>c)).map(r=>{
+    const g=i=>i>-1?(r[i]||''):'';
+    const n=i=>i>-1?parseFloat((r[i]||'').toString().replace(/[^0-9.]/g,''))||0:0;
+    return{date:g(dateI)||new Date().toISOString().slice(0,10),product:g(prodI)||'Unknown',category:g(catI)||'General',region:g(regI)||'Unknown',customer:g(custI)||'Unknown',revenue:n(revI),units:n(unitI)||1,status:(g(stI)||'completed').toLowerCase()};
+  }).filter(d=>d.revenue>0||d.units>0);
+}
+
+document.getElementById('fileInput').addEventListener('change',function(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  if(file.name.endsWith('.csv')){
+    Papa.parse(file,{complete:res=>{
+      const parsed=parseRows(res.data);
+      if(parsed.length){allData=parsed;filteredData=[...allData];populateFilters();render();}
+      else alert('Could not read file. Make sure it has columns: date, product, category, region, customer, revenue, units, status');
+    }});
+  }else{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      const parsed=parseRows(rows);
+      if(parsed.length){allData=parsed;filteredData=[...allData];populateFilters();render();}
+      else alert('Could not read file. Make sure it has columns: date, product, category, region, customer, revenue, units, status');
+    };
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+document.getElementById('yearFilter').addEventListener('change',applyFilters);
+document.getElementById('regionFilter').addEventListener('change',applyFilters);
+document.getElementById('statusFilter').addEventListener('change',applyFilters);
+document.getElementById('searchBox').addEventListener('input',applyFilters);
+
+document.querySelectorAll('.chip[data-period]').forEach(chip=>{
+  chip.addEventListener('click',function(){
+    document.querySelectorAll('.chip[data-period]').forEach(c=>c.classList.remove('active'));
+    this.classList.add('active');
+    period=this.dataset.period;
+    renderTrend();
+  });
+});
+
+populateFilters();
+render();
+</script>
+</body>
+</html>
